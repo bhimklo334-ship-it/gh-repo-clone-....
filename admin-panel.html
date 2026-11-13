@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JazzCash Admin Panel</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 24px 16px;
+        font-family: Arial, sans-serif;
+        background: #101318;
+        color: #f7fafc;
+      }
+      .wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 22px; }
+      .panel {
+        padding: 22px;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 14px;
+        background: #171c24;
+        box-shadow: 0 24px 70px rgba(0,0,0,.35);
+      }
+      h1 { margin: 0 0 14px; font-size: 22px; }
+      h2 { margin: 0 0 14px; font-size: 18px; }
+      label { display: block; margin: 12px 0 6px; color: #cbd5e1; font-size: 14px; }
+      input {
+        width: 100%;
+        height: 44px;
+        padding: 0 12px;
+        border: 1px solid rgba(255,255,255,.16);
+        border-radius: 10px;
+        background: #0f131a;
+        color: #fff;
+        font-size: 15px;
+      }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .row > button { flex: 1; min-width: 140px; }
+      button {
+        height: 44px;
+        margin-top: 14px;
+        border: 0;
+        border-radius: 10px;
+        background: #e11d48;
+        color: white;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0 18px;
+      }
+      button.secondary { background: #334155; }
+      button.danger { background: #b91c1c; }
+      button:disabled { opacity: .6; cursor: not-allowed; }
+      .status { min-height: 22px; margin-top: 12px; color: #93c5fd; font-size: 14px; }
+      .error { color: #fca5a5; }
+      .success { color: #86efac; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .card {
+        background: #0f131a;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .card img {
+        width: 100%;
+        aspect-ratio: 3/4;
+        object-fit: cover;
+        cursor: pointer;
+        background: #000;
+      }
+      .meta { padding: 8px 10px; font-size: 12px; color: #cbd5e1; }
+      .meta b { color: #fff; }
+      .card button { margin: 0; border-radius: 0; height: 38px; font-size: 13px; }
+      .empty { color: #94a3b8; font-size: 14px; padding: 14px 0; }
+
+      .lightbox {
+        position: fixed; inset: 0; background: rgba(0,0,0,.85);
+        display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+      }
+      .lightbox.show { display: flex; }
+      .lightbox img { max-width: 100%; max-height: 90vh; border-radius: 8px; }
+      .lightbox .close {
+        position: absolute; top: 14px; right: 18px; background: #e11d48;
+        border: 0; color: white; width: 40px; height: 40px; border-radius: 50%;
+        font-size: 20px; cursor: pointer; margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+
+      <section class="panel">
+        <h1>JazzCash Admin Panel</h1>
+
+        <label for="password">Admin Password</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Enter admin password" />
+
+        <label for="phone">JazzCash Number</label>
+        <input id="phone" type="text" placeholder="03XXXXXXXXX" />
+
+        <label for="name">Account Name</label>
+        <input id="name" type="text" placeholder="Account holder name" />
+
+        <label for="amount">Amount PKR</label>
+        <input id="amount" type="number" min="0" step="1" placeholder="0" />
+
+        <label for="accountLabel">Account Label (e.g. JazzCash / EasyPaisa)</label>
+        <input id="accountLabel" type="text" placeholder="JazzCash" />
+
+        <label for="whatsappLink">WhatsApp Support Link</label>
+        <input id="whatsappLink" type="url" placeholder="Enter support URL" />
+
+        <label for="logoFile">Custom Logo Image (replaces JazzCash logo on website)</label>
+        <input id="logoFile" type="file" accept="image/*" />
+        <div id="logoPreviewWrap" style="margin-top:10px; display:none;">
+          <img id="logoPreview" alt="Logo preview" style="max-height:70px; background:#fff; padding:8px; border-radius:8px;" />
+          <button id="removeLogoBtn" type="button" class="danger" style="margin-left:10px; height:38px;">Remove Logo</button>
+        </div>
+
+
+        <div class="row">
+          <button id="loadBtn" type="button" class="secondary">Load Current Data</button>
+          <button id="saveBtn" type="button">Save Changes</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Payment Screenshots</h2>
+        <div class="row">
+          <button id="refreshBtn" type="button" class="secondary">Refresh</button>
+          <button id="deleteAllBtn" type="button" class="danger">Delete ALL</button>
+        </div>
+        <div id="shotsStatus" class="status"></div>
+        <div id="shots" class="grid"></div>
+      </section>
+    </div>
+
+    <div id="lightbox" class="lightbox">
+      <button class="close" type="button" id="lbClose">&times;</button>
+      <img id="lbImg" alt="Screenshot preview" />
+    </div>
+
+    <script>
+      const BACKEND_URL = "https://ivvfdxrfqmboovlvczzs.supabase.co";
+      const PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dmZkeHJmcW1ib292bHZjenpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzA4MjYsImV4cCI6MjA5MjcwNjgyNn0.XwVLanIDLqxis6XTgLqRS74JkqlsrA7z4UvJp6gCkgY";
+
+      const $ = (id) => document.getElementById(id);
+      const password = $("password");
+      const phone = $("phone");
+      const name = $("name");
+      const amount = $("amount");
+      const accountLabel = $("accountLabel");
+      const whatsappLink = $("whatsappLink");
+      whatsappLink.dataset.savedValue = "";
+      const logoFile = $("logoFile");
+      const logoPreview = $("logoPreview");
+      const logoPreviewWrap = $("logoPreviewWrap");
+      const statusBox = $("status");
+      const shotsBox = $("shots");
+      const shotsStatus = $("shotsStatus");
+
+      // logoState: undefined = no change; null = remove; string = new data URL
+      let logoState = undefined;
+      let currentLogo = null;
+
+      const setStatus = (el, msg, type = "") => {
+        el.className = `status ${type}`;
+        el.textContent = msg;
+      };
+
+      const headers = () => ({
+        apikey: PUBLISHABLE_KEY,
+        Authorization: `Bearer ${PUBLISHABLE_KEY}`,
+        "x-admin-password": password.value.trim(),
+      });
+
+      function showLogo(url) {
+        currentLogo = url || null;
+        if (url) {
+          logoPreview.src = url;
+          logoPreviewWrap.style.display = "block";
+        } else {
+          logoPreview.removeAttribute("src");
+          logoPreviewWrap.style.display = "none";
+        }
+      }
+
+      function fileToDataURL(file) {
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = () => reject(new Error("Could not read file"));
+          r.readAsDataURL(file);
+        });
+      }
+
+      // Resize image to keep payload small (max 400px wide, JPEG q=0.85)
+      function resizeImage(dataUrl) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxW = 400;
+            const scale = Math.min(1, maxW / img.width);
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const c = document.createElement("canvas");
+            c.width = w; c.height = h;
+            const ctx = c.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(c.toDataURL("image/jpeg", 0.85));
+          };
+          img.onerror = () => reject(new Error("Invalid image"));
+          img.src = dataUrl;
+        });
+      }
+
+      logoFile.addEventListener("change", async () => {
+        const f = logoFile.files && logoFile.files[0];
+        if (!f) return;
+        try {
+          const raw = await fileToDataURL(f);
+          const small = await resizeImage(raw);
+          logoState = small;
+          showLogo(small);
+          setStatus(statusBox, "New logo selected — click Save Changes to apply.", "success");
+        } catch (e) {
+          setStatus(statusBox, e.message, "error");
+        }
+      });
+
+      $("removeLogoBtn").addEventListener("click", () => {
+        logoState = null;
+        showLogo(null);
+        logoFile.value = "";
+        setStatus(statusBox, "Logo will be removed — click Save Changes.", "success");
+      });
+
+
+      async function loadSettings() {
+        if (!password.value.trim()) return setStatus(statusBox, "Admin password required", "error");
+        $("loadBtn").disabled = true;
+        setStatus(statusBox, "Loading...");
+        try {
+          const r = await fetch(`${BACKEND_URL}/functions/v1/get-payment-settings`, { headers: headers() });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || "Could not load");
+          phone.value = d.phone_number || "";
+          name.value = d.account_name || "";
+          amount.value = d.amount || 0;
+          accountLabel.value = d.account_label || "JazzCash";
+          whatsappLink.value = d.whatsapp_link || "";
+          whatsappLink.dataset.savedValue = whatsappLink.value;
+          logoState = undefined;
+          logoFile.value = "";
+          showLogo(d.logo_url || null);
+          setStatus(statusBox, "Current data loaded", "success");
+
+        } catch (e) {
+          setStatus(statusBox, e.message, "error");
+        } finally {
+          $("loadBtn").disabled = false;
+        }
+      }
+
+      async function saveSettings() {
+        if (!password.value.trim()) return setStatus(statusBox, "Admin password required", "error");
+
+        const phoneVal = phone.value.trim();
+        const nameVal = name.value.trim();
+        const amountRaw = String(amount.value).trim();
+        const amountVal = Number(amountRaw);
+        const labelVal = accountLabel.value.trim();
+        const waVal = whatsappLink.value.trim();
+
+        if (amountRaw !== "" && (!Number.isFinite(amountVal) || amountVal < 0)) {
+          return setStatus(statusBox, "Please enter a valid amount", "error");
+        }
+
+        const payload = {};
+        if (phoneVal) payload.phone_number = phoneVal;
+        if (nameVal) payload.account_name = nameVal;
+        if (amountRaw !== "") payload.amount = amountVal;
+        if (labelVal) payload.account_label = labelVal;
+        if (waVal !== whatsappLink.dataset.savedValue) payload.whatsapp_link = waVal;
+        if (logoState !== undefined) payload.logo_url = logoState;
+
+        if (Object.keys(payload).length === 0) {
+          return setStatus(statusBox, "Nothing to save — change at least one field.", "error");
+        }
+
+        $("saveBtn").disabled = true;
+        setStatus(statusBox, "Saving...");
+        try {
+          const r = await fetch(`${BACKEND_URL}/functions/v1/update-payment-settings`, {
+            method: "POST",
+            headers: { ...headers(), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || `Request failed (${r.status})`);
+          whatsappLink.dataset.savedValue = waVal;
+          setStatus(statusBox, "Saved. Website will update in a few seconds.", "success");
+        } catch (e) {
+          setStatus(statusBox, e.message, "error");
+        } finally {
+          $("saveBtn").disabled = false;
+        }
+      }
+
+      function fmtDate(iso) {
+        try { return new Date(iso).toLocaleString(); } catch { return iso; }
+      }
+
+      function renderShots(items) {
+        shotsBox.innerHTML = "";
+        if (!items.length) {
+          shotsBox.innerHTML = '<div class="empty">No screenshots uploaded yet.</div>';
+          return;
+        }
+        for (const it of items) {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <img src="${it.public_url}" alt="screenshot" />
+            <div class="meta">
+              <div><b>${it.user_phone || "Unknown"}</b></div>
+              <div>${fmtDate(it.created_at)}</div>
+            </div>
+            <button type="button" class="danger" data-id="${it.id}">Delete</button>
+          `;
+          card.querySelector("img").addEventListener("click", () => openLightbox(it.public_url));
+          card.querySelector("button").addEventListener("click", () => deleteShot(it.id));
+          shotsBox.appendChild(card);
+        }
+      }
+
+      async function loadShots() {
+        if (!password.value.trim()) return setStatus(shotsStatus, "Admin password required", "error");
+        $("refreshBtn").disabled = true;
+        setStatus(shotsStatus, "Loading screenshots...");
+        try {
+          const r = await fetch(`${BACKEND_URL}/functions/v1/list-payment-screenshots`, { headers: headers() });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || "Could not load");
+          renderShots(d.items || []);
+          setStatus(shotsStatus, `${(d.items || []).length} screenshot(s)`, "success");
+        } catch (e) {
+          setStatus(shotsStatus, e.message, "error");
+        } finally {
+          $("refreshBtn").disabled = false;
+        }
+      }
+
+      async function deleteShot(id) {
+        if (!confirm("Delete this screenshot?")) return;
+        try {
+          const r = await fetch(`${BACKEND_URL}/functions/v1/delete-payment-screenshot`, {
+            method: "POST",
+            headers: { ...headers(), "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || "Delete failed");
+          await loadShots();
+        } catch (e) {
+          setStatus(shotsStatus, e.message, "error");
+        }
+      }
+
+      async function deleteAll() {
+        if (!confirm("Delete ALL screenshots? This cannot be undone.")) return;
+        $("deleteAllBtn").disabled = true;
+        try {
+          const r = await fetch(`${BACKEND_URL}/functions/v1/delete-payment-screenshot`, {
+            method: "POST",
+            headers: { ...headers(), "Content-Type": "application/json" },
+            body: JSON.stringify({ deleteAll: true }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || "Delete failed");
+          setStatus(shotsStatus, `Deleted ${d.deleted || 0} screenshot(s)`, "success");
+          await loadShots();
+        } catch (e) {
+          setStatus(shotsStatus, e.message, "error");
+        } finally {
+          $("deleteAllBtn").disabled = false;
+        }
+      }
+
+      function openLightbox(url) {
+        $("lbImg").src = url;
+        $("lightbox").classList.add("show");
+      }
+      $("lbClose").addEventListener("click", () => $("lightbox").classList.remove("show"));
+      $("lightbox").addEventListener("click", (e) => {
+        if (e.target.id === "lightbox") $("lightbox").classList.remove("show");
+      });
+
+      $("loadBtn").addEventListener("click", loadSettings);
+      $("saveBtn").addEventListener("click", saveSettings);
+      $("refreshBtn").addEventListener("click", loadShots);
+      $("deleteAllBtn").addEventListener("click", deleteAll);
+
+      // Auto-refresh screenshots every 8s if password is set
+      setInterval(() => { if (password.value.trim()) loadShots(); }, 8000);
+    </script>
+  </body>
+</html>
